@@ -13,7 +13,12 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Scanner;
+
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.JColorChooser;
@@ -40,7 +45,8 @@ public class DrawTextPanel extends JPanel {
 	// variable should be replaced by a variable of type
 	// ArrayList<DrawStringItem> that can store multiple items.
 
-	private DrawTextItem theString; // change to an ArrayList<DrawTextItem> !
+	private ArrayList<DrawTextItem> theString = new ArrayList<DrawTextItem>(); // change to an ArrayList<DrawTextItem> !
+	private String fileSeparator = " ### ";
 
 	private Color currentTextColor = Color.BLACK; // Color applied to new strings.
 
@@ -65,8 +71,11 @@ public class DrawTextPanel extends JPanel {
 		protected void paintComponent(Graphics g) {
 			super.paintComponent(g);
 			((Graphics2D) g).setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-			if (theString != null)
-				theString.draw(g);
+
+			theString.forEach(str -> {
+				if (str != null)
+					str.draw(g);
+			});
 		}
 	}
 
@@ -138,7 +147,7 @@ public class DrawTextPanel extends JPanel {
 		// s.setBackgroundTransparency(0.7); // Default is 0, meaning background is not
 		// transparent.
 
-		theString = s; // Set this string as the ONLY string to be drawn on the canvas!
+		theString.add(s); // Set this string as the ONLY string to be drawn on the canvas!
 		undoMenuItem.setEnabled(true);
 		canvas.repaint();
 	}
@@ -182,6 +191,10 @@ public class DrawTextPanel extends JPanel {
 			clearItem.addActionListener(menuHandler);
 			editMenu.add(clearItem);
 
+			JMenuItem add30strings = new JMenuItem("add 30 strings");
+			add30strings.addActionListener(menuHandler);
+			editMenu.add(add30strings);
+
 			JMenu optionsMenu = new JMenu("Options");
 			menuBar.add(optionsMenu);
 			JMenuItem colorItem = new JMenuItem("Set Text Color...");
@@ -200,21 +213,67 @@ public class DrawTextPanel extends JPanel {
 	 * Carry out one of the commands from the menu bar.
 	 * 
 	 * @param command the text of the menu command.
+	 * @throws FileNotFoundException
 	 */
 	private void doMenuCommand(String command) {
 		if (command.equals("Save...")) { // save all the string info to a file
-			JOptionPane.showMessageDialog(this, "Sorry, the Save command is not implemented.");
+			File fileToSave = fileChooser.getOutputFile(this, "Select File Name",
+					theString.get(0).getString() + ".txt");
+			if (fileToSave == null)
+				return;
+			try {
+				PrintWriter pw = new PrintWriter(fileToSave);
+				pw.println("String" + fileSeparator + "x" + fileSeparator + "Y" + fileSeparator + "color: R"
+						+ fileSeparator + "color: G" + fileSeparator + "color: B");
+
+				theString.forEach(str -> {
+					pw.println(str.getString() + fileSeparator + str.getX() + fileSeparator + str.getY() + fileSeparator
+							+ str.getTextColor().getRed() + fileSeparator + str.getTextColor().getGreen()
+							+ fileSeparator + str.getTextColor().getBlue());
+				});
+				pw.flush();
+				pw.close();
+			} catch (Exception e) {
+				JOptionPane.showMessageDialog(this, "Sorry, an error occurred while trying to save the file:\n" + e);
+			}
 		} else if (command.equals("Open...")) { // read a previously saved file, and reconstruct the list of strings
-			JOptionPane.showMessageDialog(this, "Sorry, the Open command is not implemented.");
-			canvas.repaint(); // (you'll need this to make the new list of strings take effect)
+			File fileToOpen = fileChooser.getInputFile(this, "Select File Name");
+			if (fileToOpen == null)
+				return;
+			try {
+				Scanner fs = new Scanner(fileToOpen);
+				theString.clear(); // remove the existing image
+				for (int lineNum = 1; fs.hasNext(); lineNum++) {
+					String line = fs.nextLine();
+					String[] lineData = line.split(fileSeparator);
+					System.out.println(Arrays.toString(lineData));
+					if (lineNum >= 2) { // skip the first line
+						DrawTextItem s = new DrawTextItem(lineData[0], Integer.parseInt(lineData[1]),
+								Integer.parseInt(lineData[2]));
+						s.setTextColor(new Color(Integer.parseInt(lineData[3]), Integer.parseInt(lineData[4]),
+								Integer.parseInt(lineData[5])));
+						theString.add(s); // Set this string as the ONLY string to be drawn on the canvas!
+						undoMenuItem.setEnabled(true);
+					}
+
+				}
+
+				fs.close();
+				canvas.repaint(); // (you'll need this to make the new list of strings take effect)
+
+			} catch (Exception e) {
+				JOptionPane.showMessageDialog(this, "Sorry, an error occurred while trying to open the file:\n" + e);
+			}
 		} else if (command.equals("Clear")) { // remove all strings
-			theString = null; // Remove the ONLY string from the canvas.
+			theString.clear(); // Remove the ONLY string from the canvas.
 			undoMenuItem.setEnabled(false);
 			canvas.repaint();
 		} else if (command.equals("Remove Item")) { // remove the most recently added string
-			theString = null; // Remove the ONLY string from the canvas.
-			undoMenuItem.setEnabled(false);
-			canvas.repaint();
+			if (theString.size() > 1) {
+				theString.remove(theString.get(theString.size() - 1)); // Remove the ONLY string from the canvas.
+				undoMenuItem.setEnabled(false);
+				canvas.repaint();
+			}
 		} else if (command.equals("Set Text Color...")) {
 			Color c = JColorChooser.showDialog(this, "Select Text Color", currentTextColor);
 			if (c != null)
@@ -245,7 +304,35 @@ public class DrawTextPanel extends JPanel {
 			} catch (Exception e) {
 				JOptionPane.showMessageDialog(this, "Sorry, an error occurred while trying to save the image:\n" + e);
 			}
+		} else if (command.equals("add 30 strings")) {
+			try {
+				for (int i = 0; i < 30; i++) {
+					DrawTextItem s = new DrawTextItem("lorem ipsum", generateRandomInt("x"), generateRandomInt("y"));
+					s.setTextColor(new Color(generateRandomInt("color"), generateRandomInt("color"),
+							generateRandomInt("color")));
+					theString.add(s); // Set this string as the ONLY string to be drawn on the canvas!
+					undoMenuItem.setEnabled(true);
+				}
+				canvas.repaint();
+			} catch (Exception e) {
+				JOptionPane.showMessageDialog(this, "Sorry, an error occurred while trying to add 30 strings:\n" + e);
+			}
 		}
+	}
+
+	public static int generateRandomInt(String type) {
+		int min = 0;
+		int max = 0;
+
+		if (type.equals("x"))
+			max = 800;
+		if (type.equals("y"))
+			max = 600;
+		if (type.equals("color"))
+			max = 250;
+
+		int random_int = (int) Math.floor(Math.random() * (max - min + 1) + min);
+		return random_int;
 	}
 
 }
