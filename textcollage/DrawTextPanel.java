@@ -320,6 +320,12 @@ public class DrawTextPanel extends JPanel {
 		}
 	}
 
+	/**
+	 * 
+	 * @param type the type of element that you are generating the int for:
+	 *             x(0,800), y(0.600) or color (0,250)
+	 * @return integer to be supplied to the adding function.
+	 */
 	public static int generateRandomInt(String type) {
 		int min = 0;
 		int max = 0;
